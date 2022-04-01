@@ -17,7 +17,6 @@ def create_data_model():
     data['bin_capacity'] = 100
     return data
 
-
 data = create_data_model()
 
 # Create the mip solver with the SCIP backend.
