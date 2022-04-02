@@ -15,63 +15,69 @@ def create_data_model():
     data['items'] = list(range(len(weights)))
     data['bins'] = data['items']
     data['bin_capacity'] = 100
-    return data
 
-data = create_data_model()
+    # Create the mip solver with the SCIP backend.
+    solver = pywraplp.Solver.CreateSolver('SCIP')
 
-# Create the mip solver with the SCIP backend.
-solver = pywraplp.Solver.CreateSolver('SCIP')
+    # Variables
+    # x[i, j] = 1 if item i is packed in bin j.
+    x = {}
+    for i in data['items']:
+        for j in data['bins']:
+            x[(i, j)] = solver.IntVar(0, 1, 'x_%i_%i' % (i, j))
 
-# Variables
-# x[i, j] = 1 if item i is packed in bin j.
-x = {}
-for i in data['items']:
+    # y[j] = 1 if bin j is used.
+    y = {}
     for j in data['bins']:
-        x[(i, j)] = solver.IntVar(0, 1, 'x_%i_%i' % (i, j))
+        y[j] = solver.IntVar(0, 1, 'y[%i]' % j)
 
-# y[j] = 1 if bin j is used.
-y = {}
-for j in data['bins']:
-    y[j] = solver.IntVar(0, 1, 'y[%i]' % j)
+    # Constraints
+    # Each item must be in exactly one bin.
+    for i in data['items']:
+        solver.Add(sum(x[i, j] for j in data['bins']) == 1)
 
-# Constraints
-# Each item must be in exactly one bin.
-for i in data['items']:
-    solver.Add(sum(x[i, j] for j in data['bins']) == 1)
-
-# The amount packed in each bin cannot exceed its capacity.
-for j in data['bins']:
-    solver.Add(
-        sum(x[(i, j)] * data['weights'][i] for i in data['items']) <= y[j] *
-        data['bin_capacity'])
-
-# Objective: minimize the number of bins used.
-solver.Minimize(solver.Sum([y[j] for j in data['bins']]))
-
-status = solver.Solve()
-
-if status == pywraplp.Solver.OPTIMAL:
-    num_bins = 0.
+    # The amount packed in each bin cannot exceed its capacity.
     for j in data['bins']:
-        if y[j].solution_value() == 1:
-            bin_items = []
-            bin_weight = 0
-            for i in data['items']:
-                if x[i, j].solution_value() > 0:
-                    weight = data['weights'][i]
-                    bin_items.append(weight)
-                    bin_weight += weight
-            if bin_weight > 0:
-                num_bins += 1
-                print('Bin number', j)
-                print('  Items packed:', bin_items)
-                print('  Total weight:', bin_weight)
-                print()
-    print()
-    print('Number of bins used:', num_bins)
-    print('Time = ', solver.WallTime(), ' milliseconds')
-else:
-    print('The problem does not have an optimal solution.')
+        solver.Add(
+            sum(x[(i, j)] * data['weights'][i] for i in data['items']) <= y[j] *
+            data['bin_capacity'])
+
+    # Objective: minimize the number of bins used.
+    solver.Minimize(solver.Sum([y[j] for j in data['bins']]))
+
+    status = solver.Solve()
+
+# ------- plot props start -------
+
+    labels = []
+    men_means = []
+    women_means = [25, 32, 34, 20, 25]
+    width = 0.35  # the width of the bars: can also be len(x) sequence
+
+# ------- plot props end -------
+
+    if status == pywraplp.Solver.OPTIMAL:
+        num_bins = 0.
+        for j in data['bins']:
+            if y[j].solution_value() == 1:
+                bin_items = []
+                bin_weight = 0
+                for i in data['items']:
+                    if x[i, j].solution_value() > 0:
+                        weight = data['weights'][i]
+                        bin_items.append(weight)
+                        bin_weight += weight
+                if bin_weight > 0:
+                    num_bins += 1
+                    print('Bin number', j)
+                    print('  Items packed:', bin_items)
+                    print('  Total weight:', bin_weight)
+                    print()
+        print()
+        print('Number of bins used:', num_bins)
+        print('Time = ', solver.WallTime(), ' milliseconds')
+    else:
+        print('The problem does not have an optimal solution.')
 
 # ------------------------------- Google optimization algorithm -------------------------------
 
@@ -106,6 +112,8 @@ def draw_figure(canvas, figure):
 
 
 # ------------------------------- Beginning of GUI CODE -------------------------------
+
+sg.theme('Default1')  # please make your windows colorful
 
 # define the window layout
 layout = [[sg.Text('Plot test')],
